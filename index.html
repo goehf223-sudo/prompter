@@ -47,7 +47,15 @@ nav{border-right:1px solid var(--line);overflow:auto;padding:10px;display:flex;f
 .singing .u{-webkit-text-fill-color:transparent}
 .meter{position:relative;height:14px;border-radius:7px;background:var(--line);max-width:36em;overflow:hidden}
 .meter .fill{position:absolute;inset:0 auto 0 0;background:var(--sing);width:0}
-.meter .fill.over{background:var(--rec)}
+.meter .fill.over,.meter .fill.v-redo{background:var(--rec)}
+.meter .fill.v-ok{background:var(--ok)}
+.meter .fill.v-fix{background:var(--sing)}
+.meter .tick{position:absolute;top:0;bottom:0;width:2px;background:var(--bg);opacity:.9}
+.verdict{display:inline-block;font-family:var(--font);font-weight:700;font-size:14px;padding:2px 10px;border-radius:999px;margin-right:8px}
+.verdict.v-ok{background:var(--ok);color:#0d1a12}
+.verdict.v-fix{background:var(--sing);color:#151510}
+.verdict.v-redo{background:var(--rec);color:#fff}
+.chip.v-ok .st{color:var(--ok)} .chip.v-fix .st{color:var(--sing)} .chip.v-redo .st{color:var(--rec)}
 .mtxt{font-family:var(--mono);font-size:13px;color:var(--dim)}
 .btns{display:flex;flex-wrap:wrap;gap:10px}
 #rec{background:var(--rec);border-color:var(--rec);color:#fff;font-weight:700;min-width:8.5em}
@@ -96,7 +104,7 @@ button:disabled{filter:grayscale(1)}
     <div class="meta" id="meta"></div>
     <div class="lines" id="lines"></div>
     <div>
-      <div class="meter"><div class="fill" id="fill"></div></div>
+      <div class="meter"><div class="fill" id="fill"></div><i class="tick" style="left:calc(65%/1.1)"></i><i class="tick" style="left:calc(75%/1.1)"></i><i class="tick" style="left:calc(100%/1.1)"></i></div>
       <div class="mtxt" id="mtxt"></div>
     </div>
     <div class="btns">
@@ -167,6 +175,15 @@ function units(s){
 }
 function slotLen(k){ const v=+$("vlen").value||60; return (k+1<paras.length?paras[k+1].t:v)-paras[k].t; }
 function guideLen(k){ let t=VOICE_AT; for(const l of paras[k].lines){ t+=units(l).reduce((a,x)=>a+x[1],0)+GAP; } return t-GAP; }
+function verdict(k){
+  const tk=takes[k]; if(!tk) return null;
+  const L=slotLen(k), used=tk.len+VOICE_AT, r=used/L, spare=L-used;
+  if(r>1.08) return {c:"v-redo",t:"다시",d:`넘침 ${(used-L).toFixed(2)}초 · 다시 녹음`};
+  if(r>1.0) return {c:"v-fix",t:"보정 가능",d:`넘침 ${(used-L).toFixed(2)}초 · 쉼을 줄여 맞춤`};
+  if(r>=0.75 || (L<=5 && spare<=1.2)) return {c:"v-ok",t:"합격",d:`여유 ${spare.toFixed(2)}초`};
+  if(r>=0.65) return {c:"v-fix",t:"보정 가능",d:`여유 ${spare.toFixed(2)}초 · 쉼을 늘려 채움`};
+  return {c:"v-redo",t:"다시",d:`여유 ${spare.toFixed(2)}초 · 너무 빔, 천천히 다시`};
+}
 function label(k){ return paras[k].name || `#${k+1}`; }
 function hash(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return (h>>>0).toString(36)}
 const fmt=t=>`${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,"0")}`;
@@ -202,11 +219,11 @@ function renderList(){
   const nav=$("list"); nav.innerHTML="";
   paras.forEach((p,k)=>{
     const b=document.createElement("button"); const tk=takes[k];
-    const over = tk && tk.saved && tk.len+VOICE_AT>slotLen(k)+0.05;
-    b.className="chip"+(k===cur?" cur":"")+(tk&&tk.saved?" saved":"")+(over?" over":"");
+    const v=verdict(k);
+    b.className="chip"+(k===cur?" cur":"")+(tk&&tk.saved?" saved":"")+(v?" "+v.c:"");
     b.innerHTML=`<span class="n"></span><span class="st"></span><span class="pv"></span>`;
     b.querySelector(".n").textContent=`${label(k)} · ${fmt(p.t)}`;
-    b.querySelector(".st").textContent= tk&&tk.saved ? (over?"저장·넘침":"저장됨") : (tk?"확인 전":"미녹음");
+    b.querySelector(".st").textContent= v ? (tk.saved?"저장·":"")+v.t : "미녹음";
     b.querySelector(".pv").textContent=p.lines[0];
     b.onclick=()=>{ if(!recording){ cur=k; show(); } };
     nav.appendChild(b);
@@ -228,10 +245,14 @@ function show(){
 function updateMeter(liveT){
   const L=slotLen(cur), tk=takes[cur];
   const len = liveT!=null ? liveT : (tk? tk.len+VOICE_AT : 0);
-  const f=$("fill"); f.style.width=Math.min(100,len/L*100)+"%"; f.classList.toggle("over",len>L+0.05);
-  $("mtxt").textContent = liveT!=null ? `녹음 중 ${liveT.toFixed(1)}초 / 컷 ${L.toFixed(1)}초`
-    : tk ? `목소리 ${tk.len.toFixed(2)}초 / 컷 ${L.toFixed(1)}초 · ${len>L+0.05?`넘침 ${(len-L).toFixed(2)}초`:`여유 ${(L-len).toFixed(2)}초`}${tk.peak<0.05?" · 소리가 너무 작아요":""}${tk.peak>0.98?" · 소리가 찢어졌을 수 있어요":""}`
-    : `컷 ${L.toFixed(1)}초`;
+  const f=$("fill"), v=liveT==null?verdict(cur):null;
+  f.style.width=Math.min(100,len/(L*1.1)*100)+"%";
+  f.className="fill"+(v?" "+v.c:(len>L*1.08?" over":""));
+  const m=$("mtxt"); m.textContent="";
+  if(v){ const b=document.createElement("span"); b.className="verdict "+v.c; b.textContent=v.t; m.appendChild(b); }
+  m.appendChild(document.createTextNode( liveT!=null ? `녹음 중 ${liveT.toFixed(1)}초 / 컷 ${L.toFixed(1)}초`
+    : tk ? `목소리 ${tk.len.toFixed(2)}초 / 컷 ${L.toFixed(1)}초 (${Math.round(len/L*100)}%) · ${v.d}${tk.peak<0.05?" · 소리가 너무 작아요":""}${tk.peak>0.98?" · 소리가 찢어졌을 수 있어요":""}`
+    : `컷 ${L.toFixed(1)}초 · 막대 눈금 = 65% / 75% / 100%`));
 }
 function updateButtons(){
   const tk=takes[cur];
