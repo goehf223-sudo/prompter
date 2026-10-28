@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>녹음 프롬프터</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#101312; --panel:#171b1a; --line:#2a302e; --ink:#e9ece8; --dim:#66706b;
+  --ready:#c9cfcb; --sing:#ffd23f; --rec:#ff5a4e; --ok:#5fd18b;
+  --font:"IBM Plex Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,ui-monospace,monospace;
+  --size:36px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);display:flex;flex-direction:column}
+[hidden]{display:none!important}
+button,select,input{font:inherit;color:var(--ink)}
+button{background:transparent;border:1px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--dim)}
+button:disabled{opacity:.35;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--sing);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)}
+.bar b{color:var(--ink);font-size:15px;margin-right:8px}
+.bar label{display:flex;gap:6px;align-items:center}
+.bar input[type=range]{width:100px;accent-color:var(--sing)}
+.bar input[type=number]{width:5.5em;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.bar output{font-family:var(--mono);color:var(--ink)}
+.small{font-size:13px;padding:5px 10px}
+.wrap{flex:1;display:grid;grid-template-columns:220px 1fr;min-height:0}
+nav{border-right:1px solid var(--line);overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
+.chip{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;border-radius:10px;padding:8px 10px}
+.chip .n{font-family:var(--mono);font-size:13px}
+.chip .st{font-size:12px;color:var(--dim)}
+.chip .pv{grid-column:1/-1;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.cur{border-color:var(--sing)}
+.chip.saved .st{color:var(--ok)}
+.chip.over .st{color:var(--rec)}
+.stage{display:flex;flex-direction:column;gap:18px;padding:24px clamp(16px,4vw,48px);overflow:auto;min-width:0}
+.meta{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.lines{display:flex;flex-direction:column;gap:.35em;max-width:30em}
+.s{font-size:var(--size);line-height:1.5;font-weight:600;color:var(--ready);word-break:keep-all;overflow-wrap:anywhere}
+.u{background-image:linear-gradient(90deg,var(--sing) var(--p,0%),var(--ready) var(--p,0%));-webkit-background-clip:text;background-clip:text}
+.singing .u{-webkit-text-fill-color:transparent}
+.meter{position:relative;height:14px;border-radius:7px;background:var(--line);max-width:36em;overflow:hidden}
+.meter .fill{position:absolute;inset:0 auto 0 0;background:var(--sing);width:0}
+.meter .fill.over{background:var(--rec)}
+.mtxt{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+#rec{background:var(--rec);border-color:var(--rec);color:#fff;font-weight:700;min-width:8.5em}
+#rec.on{background:transparent;color:var(--rec)}
+#save{background:var(--ok);border-color:var(--ok);color:#0d1a12;font-weight:700}
+.msg{min-height:1.5em;color:var(--dim);font-size:14px}
+footer{border-top:1px solid var(--line);background:var(--panel);padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+#mergeBtn{background:var(--sing);border-color:var(--sing);color:#151510;font-weight:700}
+footer audio{height:36px;max-width:100%}
+#dl{color:var(--sing)}
+.count{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:9}
+.count span{font-family:var(--mono);font-size:min(40vw,220px);color:var(--sing);text-shadow:0 0 40px #000}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;width:min(760px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+textarea{width:100%;min-height:280px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px/1.6 var(--mono)}
+.drow{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+.err{color:var(--rec);font-size:13px;min-height:1.2em}
+button:disabled{filter:grayscale(1)}
+@media (max-width:640px){
+  html,body{height:auto}
+  body{display:block;min-height:100%}
+  .wrap{display:block}
+  nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .chip{width:170px;flex:none}
+  .stage{overflow:visible;padding:18px 16px 24px}
+  .btns button{flex:1 1 40%}
+  footer{position:sticky;bottom:0}
+  :root{--size:27px}
+}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>녹음 프롬프터</b>
+  <label>속도 <input id="rate" type="range" min="4" max="8" step="0.1" value="5.7"><output id="rateOut">5.7</output>음절/초</label>
+  <label>글자 <input id="size" type="range" min="20" max="56" step="2" value="36"></label>
+  <label>카운트 <select id="pre"><option value="3">3초</option><option value="2" selected>2초</option><option value="1">1초</option></select></label>
+  <label>영상 길이 <input id="vlen" type="number" step="0.01" min="1" value="60.58">초</label>
+  <button class="small" id="editBtn">대본 바꾸기</button>
+  <span>스페이스 = 녹음/멈춤 · Enter = 저장</span>
+</div>
+
+<div class="wrap">
+  <nav id="list"></nav>
+  <section class="stage">
+    <div class="meta" id="meta"></div>
+    <div class="lines" id="lines"></div>
+    <div>
+      <div class="meter"><div class="fill" id="fill"></div></div>
+      <div class="mtxt" id="mtxt"></div>
+    </div>
+    <div class="btns">
+      <button id="rec">● 녹음하기</button>
+      <button id="play" disabled>▶ 들어보기</button>
+      <button id="redo" disabled>↺ 다시 녹음</button>
+      <button id="save" disabled>✓ 저장하고 다음</button>
+    </div>
+    <div class="msg" id="msg">● 녹음하기를 누르면 카운트다운 후 녹음이 시작되고 글자가 차오릅니다. 다 읽으면 다시 눌러 멈추세요.</div>
+  </section>
+</div>
+
+<footer>
+  <button id="mergeBtn">전체 합치기</button>
+  <span class="mtxt" id="mergeInfo">저장된 뭉탱이 0개</span>
+  <audio id="mergeAudio" controls hidden></audio>
+  <a id="dl" hidden>합본 WAV 받기</a>
+</footer>
+
+<div class="count" id="count" hidden><span id="countN"></span></div>
+
+<dialog id="dlg">
+  <p class="mtxt">한 줄 = 한 뭉탱이(컷). 형식: <b>시작초|문장 / 문장</b> — 시작초는 원본 영상에서 그 뭉탱이를 읽기 시작할 시각. 이름을 붙이려면 <b>시작초|이름|문장 / 문장</b>. #으로 시작하는 줄은 무시. 대본을 바꾸면 저장된 녹음은 이 대본과 따로 보관됩니다.</p>
+  <textarea id="ta" spellcheck="false"></textarea>
+  <div class="err" id="err"></div>
+  <div class="drow"><button id="restore">쿠네쿠네 대본으로</button><button id="cancel">닫기</button><button id="apply">적용</button></div>
+</dialog>
+
+<script>
+const DEFAULT = `# 쿠네쿠네 숏츠 첫 1분
+0.00|B001|할머니에겐, 집 안에서 절대 입에 담지 않는 말이 있었다.
+4.54|C001|그게 뭐냐고 여쭤보면, 할머니는 입을 꾹 다무셨다... / 내 어깨 너머로, 창밖의 논을 한참 바라보셨다. / 그러다 딴 얘기를 꺼내셨다.
+15.32|C002|내가 그 말을 알게 된 건, 열 살 여름이었다. / 형은 열네 살이었다. 형도 그 말을 알게 됐다. / 그런데 형은, 그 말 이상의 것을 알아버렸다. / 그게 무슨 뜻인지를.
+27.70|B002|그날 이후로... 형은 더 이상, 예전의 형이 아니다.
+32.23|B003|그해 8월, 부모님은 우리를 태우고 북쪽 할머니 마을로 향했다. / 꼬박 아홉 시간이 걸렸다.
+39.92|B004|고속도로, 좁은 국도, 그다음엔 길이라 부르기도 민망한 길. / 초록 벽 사이로, 자갈 두 줄만 깔린 길이었다.
+49.48|C003|형의 이름은 슌이었다. / 형은 운전석 뒤에서 헤드폰을 끼고 있었고, / 나는 엄마 뒷자리에서 전봇대를 세다가... 잠이 들었다.`;
+const GAP=0.35, VOICE_AT=0.15, PREROLL=0.06;
+const $=id=>document.getElementById(id);
+let rate=5.7, scriptText=DEFAULT, paras=[], cur=0;
+let takes={};            // k -> {blob, buf, onset, len, saved}
+let stream=null, mr=null, recT0=0, raf=0, recording=false, actx=null, player=null;
+try{ const s=localStorage.getItem("prompter_script"); if(s) scriptText=s; }catch(e){}
+
+// ---------- script ----------
+function parse(txt){
+  const out=[];
+  for(const raw of txt.split("\n")){
+    const l=raw.trim(); if(!l||l.startsWith("#")) continue;
+    const p=l.split("|"); if(p.length<2) throw new Error(`"|"가 없는 줄: ${l.slice(0,20)}…`);
+    const t=parseFloat(p[0]); if(isNaN(t)) throw new Error(`시작초가 숫자가 아님: ${p[0]}`);
+    const name=p.length>=3?p[1].trim():"", body=p.length>=3?p.slice(2).join("|"):p[1];
+    out.push({t,name,lines:body.split(" / ").map(s=>s.trim()).filter(Boolean)});
+  }
+  if(!out.length) throw new Error("뭉탱이가 하나도 없어요.");
+  out.sort((a,b)=>a.t-b.t);
+  return out;
+}
+function units(s){
+  const u=[];let i=0;
+  while(i<s.length){
+    if(s.startsWith("...",i)){u.push(["...",0.7]);i+=3;continue}
+    const c=s[i];
+    if(/[가-힣0-9A-Za-z]/.test(c)) u.push([c,1/rate]); else if(c===",") u.push([c,0.3]); else u.push([c,0]);
+    i++;
+  }
+  return u;
+}
+function slotLen(k){ const v=+$("vlen").value||60; return (k+1<paras.length?paras[k+1].t:v)-paras[k].t; }
+function guideLen(k){ let t=VOICE_AT; for(const l of paras[k].lines){ t+=units(l).reduce((a,x)=>a+x[1],0)+GAP; } return t-GAP; }
+function label(k){ return paras[k].name || `#${k+1}`; }
+function hash(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return (h>>>0).toString(36)}
+const fmt=t=>`${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,"0")}`;
+
+// ---------- storage (IndexedDB, per script) ----------
+let idb=null;
+function openDB(){ return new Promise(r=>{ try{ const q=indexedDB.open("prompter",1); q.onupgradeneeded=()=>q.result.createObjectStore("takes"); q.onsuccess=()=>r(q.result); q.onerror=()=>r(null);}catch(e){r(null)} }); }
+function dbPut(k,v){ if(!idb) return; try{ idb.transaction("takes","readwrite").objectStore("takes").put(v,hash(scriptText)+":"+k);}catch(e){} }
+function dbDel(k){ if(!idb) return; try{ idb.transaction("takes","readwrite").objectStore("takes").delete(hash(scriptText)+":"+k);}catch(e){} }
+function dbGet(k){ return new Promise(r=>{ if(!idb) return r(null); try{ const q=idb.transaction("takes").objectStore("takes").get(hash(scriptText)+":"+k); q.onsuccess=()=>r(q.result||null); q.onerror=()=>r(null);}catch(e){r(null)} }); }
+
+// ---------- audio ----------
+function ctx(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000}); return actx; }
+async function analyse(blob){
+  const buf=await ctx().decodeAudioData(await blob.arrayBuffer());
+  const d=buf.getChannelData(0), sr=buf.sampleRate, win=Math.round(sr*0.01);
+  let peak=0; for(let i=0;i<d.length;i++){const a=Math.abs(d[i]); if(a>peak)peak=a;}
+  const thr=Math.max(0.02,peak*0.12);
+  let onset=0, last=d.length;
+  for(let i=0;i+win<d.length;i+=win){ let s=0; for(let j=i;j<i+win;j++) s+=d[j]*d[j]; if(Math.sqrt(s/win)>thr){onset=i;break;} }
+  for(let i=d.length-win;i>0;i-=win){ let s=0; for(let j=i;j<i+win;j++) s+=d[j]*d[j]; if(Math.sqrt(s/win)>thr){last=i+win;break;} }
+  return {buf, onset:onset/sr, len:Math.max(0,(last-onset)/sr), peak};
+}
+async function getStream(){
+  if(stream) return stream;
+  stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+  return stream;
+}
+
+// ---------- UI ----------
+function renderList(){
+  const nav=$("list"); nav.innerHTML="";
+  paras.forEach((p,k)=>{
+    const b=document.createElement("button"); const tk=takes[k];
+    const over = tk && tk.saved && tk.len+VOICE_AT>slotLen(k)+0.05;
+    b.className="chip"+(k===cur?" cur":"")+(tk&&tk.saved?" saved":"")+(over?" over":"");
+    b.innerHTML=`<span class="n"></span><span class="st"></span><span class="pv"></span>`;
+    b.querySelector(".n").textContent=`${label(k)} · ${fmt(p.t)}`;
+    b.querySelector(".st").textContent= tk&&tk.saved ? (over?"저장·넘침":"저장됨") : (tk?"확인 전":"미녹음");
+    b.querySelector(".pv").textContent=p.lines[0];
+    b.onclick=()=>{ if(!recording){ cur=k; show(); } };
+    nav.appendChild(b);
+  });
+  const n=Object.values(takes).filter(t=>t.saved).length;
+  $("mergeInfo").textContent=`저장된 뭉탱이 ${n}/${paras.length}개`;
+}
+let spans=[];
+function show(){
+  const p=paras[cur], L=slotLen(cur), G=guideLen(cur);
+  $("meta").textContent=`${label(cur)} · 영상 ${fmt(p.t)} 시작 · 컷 ${L.toFixed(1)}초 · 가이드 ${G.toFixed(1)}초${G>L?" (가이드가 컷보다 김: 대본을 줄이세요)":""}`;
+  const box=$("lines"); box.innerHTML=""; spans=[]; let t=VOICE_AT;
+  p.lines.forEach(line=>{ const el=document.createElement("div"); el.className="s";
+    for(const [x,d] of units(line)){ const sp=document.createElement("span"); sp.className="u"; sp.textContent=x; el.appendChild(sp); spans.push({sp,a:t,b:t+d}); t+=d; }
+    t+=GAP; box.appendChild(el); });
+  box.classList.remove("singing");
+  updateMeter(); renderList(); updateButtons();
+}
+function updateMeter(liveT){
+  const L=slotLen(cur), tk=takes[cur];
+  const len = liveT!=null ? liveT : (tk? tk.len+VOICE_AT : 0);
+  const f=$("fill"); f.style.width=Math.min(100,len/L*100)+"%"; f.classList.toggle("over",len>L+0.05);
+  $("mtxt").textContent = liveT!=null ? `녹음 중 ${liveT.toFixed(1)}초 / 컷 ${L.toFixed(1)}초`
+    : tk ? `목소리 ${tk.len.toFixed(2)}초 / 컷 ${L.toFixed(1)}초 · ${len>L+0.05?`넘침 ${(len-L).toFixed(2)}초`:`여유 ${(L-len).toFixed(2)}초`}${tk.peak<0.05?" · 소리가 너무 작아요":""}${tk.peak>0.98?" · 소리가 찢어졌을 수 있어요":""}`
+    : `컷 ${L.toFixed(1)}초`;
+}
+function updateButtons(){
+  const tk=takes[cur];
+  $("rec").textContent = recording ? "■ 멈춤" : "● 녹음하기";
+  $("rec").classList.toggle("on",recording);
+  $("play").disabled = recording || !tk;
+  $("redo").disabled = recording || !tk;
+  $("save").disabled = recording || !tk || tk.saved;
+  $("save").textContent = tk&&tk.saved ? "✓ 저장됨" : "✓ 저장하고 다음";
+}
+function msg(t){ $("msg").textContent=t; }
+
+// ---------- record ----------
+async function startRec(){
+  stopPlayer();
+  try{ await getStream(); }catch(e){ msg("마이크를 쓸 수 없어요. 브라우저 주소창 왼쪽에서 마이크를 허용한 뒤 다시 눌러주세요."); return; }
+  recording=true; updateButtons();
+  const n=+$("pre").value; const cd=$("count");
+  for(let i=n;i>0;i--){ cd.hidden=false; $("countN").textContent=i; await new Promise(r=>setTimeout(r,1000)); if(!recording){cd.hidden=true;return;} }
+  cd.hidden=true;
+  const chunks=[]; mr=new MediaRecorder(stream);
+  mr.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data) };
+  mr.onstop=async()=>{
+    const blob=new Blob(chunks,{type:mr.mimeType||"audio/webm"});
+    msg("녹음 확인 중…");
+    try{ const a=await analyse(blob); takes[cur]={blob,...a,saved:false};
+      msg(a.len<0.3?"목소리가 거의 안 잡혔어요. 마이크를 확인하고 다시 녹음해 주세요.":"▶ 들어보기로 확인하고, 괜찮으면 ✓ 저장하고 다음, 아니면 ↺ 다시 녹음.");
+    }catch(e){ msg("녹음을 읽지 못했어요. 다시 녹음해 주세요."); }
+    show();
+  };
+  mr.start(); recT0=performance.now(); $("lines").classList.add("singing"); msg("녹음 중… 다 읽으면 ■ 멈춤");
+  const loop=()=>{ const t=(performance.now()-recT0)/1000;
+    for(const x of spans){ const d=x.b-x.a; x.sp.style.setProperty("--p",(d<=0?(t>=x.a?100:0):Math.min(100,Math.max(0,(t-x.a)/d*100)))+"%"); }
+    updateMeter(t); raf=requestAnimationFrame(loop); };
+  loop();
+}
+function stopRec(){
+  recording=false; cancelAnimationFrame(raf); $("count").hidden=true;
+  if(mr && mr.state!=="inactive") mr.stop(); else show();
+  updateButtons();
+}
+function stopPlayer(){ if(player){ player.pause(); player=null; } }
+
+$("rec").onclick=()=> recording?stopRec():startRec();
+$("play").onclick=()=>{ const tk=takes[cur]; if(!tk) return; stopPlayer();
+  player=new Audio(URL.createObjectURL(tk.blob)); player.currentTime=Math.max(0,tk.onset-PREROLL); player.play(); };
+$("redo").onclick=()=>{ const tk=takes[cur]; if(tk&&tk.saved) dbDel(cur); delete takes[cur]; show(); startRec(); };
+$("save").onclick=()=>{ const tk=takes[cur]; if(!tk) return; tk.saved=true; dbPut(cur,tk.blob);
+  const next=paras.findIndex((_,k)=>k>cur && !(takes[k]&&takes[k].saved));
+  const any=paras.findIndex((_,k)=>!(takes[k]&&takes[k].saved));
+  if(next>=0) cur=next; else if(any>=0) cur=any;
+  msg(any<0?"전부 저장됐어요. 아래 '전체 합치기'를 누르세요.":"저장했어요. 다음 뭉탱이를 녹음하세요."); show(); };
+document.addEventListener("keydown",e=>{ if($("dlg").open) return;
+  if(e.code==="Space"){ e.preventDefault(); $("rec").click(); }
+  if(e.code==="Enter" && !$("save").disabled){ e.preventDefault(); $("save").click(); } });
+
+// ---------- merge ----------
+$("mergeBtn").onclick=()=>{
+  const saved=paras.map((_,k)=>takes[k]&&takes[k].saved?k:-1).filter(k=>k>=0);
+  if(!saved.length){ msg("저장된 뭉탱이가 없어요."); return; }
+  const sr=48000, notes=[]; let prevEnd=0, place=[];
+  for(const k of saved){ const tk=takes[k];
+    let at=paras[k].t+VOICE_AT-PREROLL; if(at<prevEnd+0.05){ notes.push(`${label(k)} ${(prevEnd+0.05-at).toFixed(2)}초 밀림`); at=prevEnd+0.05; }
+    const dur=tk.len+PREROLL+0.25; place.push({k,at,dur}); prevEnd=at+dur-0.25; }
+  const total=Math.max(+$("vlen").value||0, prevEnd+0.5);
+  const out=new Float32Array(Math.ceil(total*sr));
+  for(const {k,at,dur} of place){ const b=takes[k].buf, from=Math.max(0,takes[k].onset-PREROLL);
+    const chs=[]; for(let c=0;c<b.numberOfChannels;c++) chs.push(b.getChannelData(c));
+    const ratio=b.sampleRate/sr, n=Math.floor(dur*sr), o=Math.round(at*sr);
+    for(let i=0;i<n&&o+i<out.length;i++){ const si=Math.floor(from*b.sampleRate+i*ratio); if(si>=chs[0].length) break;
+      let v=0; for(const ch of chs) v+=ch[si]; v/=chs.length;
+      const fi=Math.min(1,i/(0.01*sr),(n-i)/(0.03*sr)); out[o+i]+=v*fi; } }
+  let pk=0; for(const v of out){const a=Math.abs(v); if(a>pk)pk=a;}
+  const g=pk>0?0.89/pk:1;
+  const wav=new DataView(new ArrayBuffer(44+out.length*2)); const w=(o,s)=>{for(let i=0;i<s.length;i++)wav.setUint8(o+i,s.charCodeAt(i))};
+  w(0,"RIFF");wav.setUint32(4,36+out.length*2,true);w(8,"WAVE");w(12,"fmt ");wav.setUint32(16,16,true);wav.setUint16(20,1,true);wav.setUint16(22,1,true);
+  wav.setUint32(24,sr,true);wav.setUint32(28,sr*2,true);wav.setUint16(32,2,true);wav.setUint16(34,16,true);w(36,"data");wav.setUint32(40,out.length*2,true);
+  for(let i=0;i<out.length;i++){ const v=Math.max(-1,Math.min(1,out[i]*g)); wav.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true); }
+  const url=URL.createObjectURL(new Blob([wav],{type:"audio/wav"}));
+  const d=new Date(), stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}_${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`;
+  const a=$("dl"); a.href=url; a.download=`녹음_합본_${stamp}.wav`; a.hidden=false;
+  const au=$("mergeAudio"); au.src=url; au.hidden=false;
+  $("mergeInfo").textContent=`${saved.length}/${paras.length}개 합침 · ${total.toFixed(2)}초`+(saved.length<paras.length?" · 빠진 뭉탱이는 무음":"")+(notes.length?" · "+notes.join(", "):"");
+};
+
+// ---------- settings ----------
+$("rate").oninput=e=>{ rate=+e.target.value; $("rateOut").textContent=rate.toFixed(1); if(!recording) show(); };
+$("size").oninput=e=>document.documentElement.style.setProperty("--size",e.target.value+"px");
+$("vlen").onchange=()=>show();
+$("editBtn").onclick=()=>{ $("ta").value=scriptText; $("err").textContent=""; $("dlg").showModal(); };
+$("cancel").onclick=()=>$("dlg").close();
+$("restore").onclick=()=>{ $("ta").value=DEFAULT; };
+$("apply").onclick=async()=>{ try{ parse($("ta").value); }catch(e){ $("err").textContent=e.message; return; }
+  scriptText=$("ta").value; try{localStorage.setItem("prompter_script",scriptText)}catch(e){} $("dlg").close(); await load(); };
+
+async function load(){
+  paras=parse(scriptText); takes={}; cur=0;
+  for(let k=0;k<paras.length;k++){ const blob=await dbGet(k); if(blob){ try{ takes[k]={blob,...await analyse(blob),saved:true}; }catch(e){} } }
+  const first=paras.findIndex((_,k)=>!(takes[k]&&takes[k].saved)); cur=first>=0?first:0;
+  if(Object.keys(takes).length) msg("이전에 저장한 녹음을 불러왔어요. 이어서 녹음하세요.");
+  show();
+}
+(async()=>{ idb=await openDB(); await load(); })();
+</script>
+</body>
+</html>
