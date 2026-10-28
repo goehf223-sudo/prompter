@@ -182,12 +182,13 @@ function dbGet(k){ return new Promise(r=>{ if(!idb) return r(null); try{ const q
 function ctx(){ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:48000}); return actx; }
 async function analyse(blob){
   const buf=await ctx().decodeAudioData(await blob.arrayBuffer());
-  const d=buf.getChannelData(0), sr=buf.sampleRate, win=Math.round(sr*0.01);
+  const d=buf.getChannelData(0), sr=buf.sampleRate, win=Math.round(sr*0.02);
   let peak=0; for(let i=0;i<d.length;i++){const a=Math.abs(d[i]); if(a>peak)peak=a;}
-  const thr=Math.max(0.02,peak*0.12);
+  const thr=Math.max(0.004,peak*0.035);
   let onset=0, last=d.length;
   for(let i=0;i+win<d.length;i+=win){ let s=0; for(let j=i;j<i+win;j++) s+=d[j]*d[j]; if(Math.sqrt(s/win)>thr){onset=i;break;} }
   for(let i=d.length-win;i>0;i-=win){ let s=0; for(let j=i;j<i+win;j++) s+=d[j]*d[j]; if(Math.sqrt(s/win)>thr){last=i+win;break;} }
+  onset=Math.max(0,onset-win); last=Math.min(d.length,last+Math.round(sr*0.12));
   return {buf, onset:onset/sr, len:Math.max(0,(last-onset)/sr), peak};
 }
 async function getStream(){
@@ -294,7 +295,7 @@ $("mergeBtn").onclick=()=>{
   const sr=48000, notes=[]; let prevEnd=0, place=[];
   for(const k of saved){ const tk=takes[k];
     let at=paras[k].t+VOICE_AT-PREROLL; if(at<prevEnd+0.05){ notes.push(`${label(k)} ${(prevEnd+0.05-at).toFixed(2)}초 밀림`); at=prevEnd+0.05; }
-    const dur=tk.len+PREROLL+0.25; place.push({k,at,dur}); prevEnd=at+dur-0.25; }
+    const dur=Math.min(tk.len+PREROLL+0.6, tk.buf.duration-Math.max(0,tk.onset-PREROLL)); place.push({k,at,dur}); prevEnd=at+tk.len+PREROLL; }
   const total=Math.max(+$("vlen").value||0, prevEnd+0.5);
   const out=new Float32Array(Math.ceil(total*sr));
   for(const {k,at,dur} of place){ const b=takes[k].buf, from=Math.max(0,takes[k].onset-PREROLL);
