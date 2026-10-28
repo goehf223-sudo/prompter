@@ -90,7 +90,7 @@ button:disabled{filter:grayscale(1)}
 <body>
 <div class="bar">
   <b>녹음 프롬프터</b>
-  <label>속도 <input id="rate" type="range" min="4" max="8" step="0.1" value="5.7"><output id="rateOut">5.7</output>음절/초</label>
+  <label>속도 <input id="rate" type="range" min="4" max="8" step="0.1" value="5.0"><output id="rateOut">5.0</output>음절/초</label>
   <label>글자 <input id="size" type="range" min="20" max="56" step="2" value="36"></label>
   <label>카운트 <select id="pre"><option value="3">3초</option><option value="2" selected>2초</option><option value="1">1초</option></select></label>
   <label>영상 길이 <input id="vlen" type="number" step="0.01" min="1" value="60.58">초</label>
@@ -134,17 +134,17 @@ button:disabled{filter:grayscale(1)}
 </dialog>
 
 <script>
-const DEFAULT = `# 쿠네쿠네 숏츠 첫 1분
-0.00|B001|할머니에겐, 집 안에서 절대 입에 담지 않는 말이 있었다.
-4.54|C001|그게 뭐냐고 여쭤보면, 할머니는 입을 꾹 다무셨다... / 내 어깨 너머로, 창밖의 논을 한참 바라보셨다. / 그러다 딴 얘기를 꺼내셨다.
-15.32|C002|내가 그 말을 알게 된 건, 열 살 여름이었다. / 형은 열네 살이었다. 형도 그 말을 알게 됐다. / 그런데 형은, 그 말 이상의 것을 알아버렸다. / 그게 무슨 뜻인지를.
-27.70|B002|그날 이후로... 형은 더 이상, 예전의 형이 아니다.
-32.23|B003|그해 8월, 부모님은 우리를 태우고 북쪽 할머니 마을로 향했다. / 꼬박 아홉 시간이 걸렸다.
-39.92|B004|고속도로, 좁은 국도, 그다음엔 길이라 부르기도 민망한 길. / 초록 벽 사이로, 자갈 두 줄만 깔린 길이었다.
-49.48|C003|형의 이름은 슌이었다. / 형은 운전석 뒤에서 헤드폰을 끼고 있었고, / 나는 엄마 뒷자리에서 전봇대를 세다가... 잠이 들었다.`;
+const DEFAULT = `# 쿠네쿠네 숏츠 첫 1분 (여유 있게 줄인 버전)
+0.00|B001|할머니에겐 집에서 꺼내지 않는 말이 있었다.
+4.54|C001|그게 뭐냐고 물으면, 할머니는 입을 다무셨다... / 그리고 창밖의 논만 한참 바라보셨다.
+15.32|C002|그 말을 알게 된 건, 열 살 여름이었다. / 열네 살이던 형도 그 말을 알게 됐다. / 하지만 형은... 그 뜻까지 알아버렸다.
+27.70|B002|그날 이후로... 형은 예전의 형이 아니다.
+32.23|B003|그해 8월, 우리는 할머니 마을로 향했다. / 꼬박 아홉 시간이었다.
+39.92|B004|고속도로, 좁은 국도, 그리고 길도 아닌 길. / 초록 벽 사이, 자갈 두 줄뿐인 길이었다.
+49.48|C003|형의 이름은 슌. / 형은 헤드폰을 끼고 있었고, / 나는 엄마 뒤에서 전봇대를 세다가... 잠이 들었다.`;
 const GAP=0.35, VOICE_AT=0.15, PREROLL=0.06;
 const $=id=>document.getElementById(id);
-let rate=5.7, scriptText=DEFAULT, paras=[], cur=0;
+let rate=5.0, scriptText=DEFAULT, paras=[], cur=0;
 let takes={};            // k -> {blob, buf, onset, len, saved}
 let stream=null, mr=null, recT0=0, raf=0, recording=false, actx=null, player=null;
 try{ const s=localStorage.getItem("prompter_script"); if(s) scriptText=s; }catch(e){}
